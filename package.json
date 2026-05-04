@@ -1,7 +1,15 @@
 {
   "name": "@alisdev/be-kit",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "All-in-one backend utility kit for Node.js + TypeScript",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Alis-Dev-idn/be-kit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Alis-Dev-idn/be-kit/issues"
+  },
+  "homepage": "https://github.com/Alis-Dev-idn/be-kit#readme",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
