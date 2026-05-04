@@ -9,6 +9,46 @@ The `router-kit` bridges Object-Oriented Programming with Express.js by allowing
 - **Middleware**: Attach Express middleware at the class or method level.
 - **Exception Handling**: Standardized HTTP Exceptions.
 
+## Usage
+
+### Define Controller
+
+```typescript
+import { 
+  ReqController, GetMapping, PostMapping, 
+  Body, Param, UseMiddleware 
+} from "@alisdev/be-kit"
+
+@ReqController("/users")
+@UseMiddleware(authGuard)
+export class UserController {
+  
+  @GetMapping("/:id")
+  async getUser(@Param("id") id: string) {
+    return { id, name: "John Doe" }
+  }
+
+  @PostMapping("/")
+  async createUser(@Body() data: any) {
+    return { success: true, data }
+  }
+}
+```
+
+### Register Controller
+
+```typescript
+import express from "express"
+import { RouterKit } from "@alisdev/be-kit"
+
+const app = express()
+app.use(express.json())
+
+RouterKit.register(app, [UserController])
+
+app.listen(3000)
+```
+
 ## API Reference & Variables
 
 ### 1. Class & Method Decorators
@@ -58,14 +98,3 @@ Throwing these exceptions anywhere in the controller will automatically return a
 | `NotFoundException` | 404 | "Not Found" |
 | `ConflictException` | 409 | "Conflict" |
 | `ServerErrorException` | 500 | "Internal Server Error" |
-
-```typescript
-import { NotFoundException } from "@alisdev/be-kit";
-
-@GetMapping("/:id")
-async getProduct(@Param("id") id: string) {
-  const product = await repo.findById(id);
-  if (!product) throw new NotFoundException(`Product ${id} not found`);
-  return product;
-}
-```

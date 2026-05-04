@@ -2,6 +2,50 @@
 
 The `scheduler-kit` provides a robust, decorator-based abstraction for defining, registering, and managing cron jobs in Node.js applications.
 
+## Features
+
+- **Decorator-based Jobs**: Define recurring tasks with `@CronJob`.
+- **Job Management**: Start, stop, pause, and resume jobs at runtime.
+- **Dynamic Registration**: Register jobs dynamically from database or config.
+- **Status Monitoring**: Get detailed status of all registered jobs.
+- **Retry Logic**: Automatic retry on failure with configurable attempts.
+
+## Usage
+
+### Setup
+
+```typescript
+import { SchedulerKit } from "@alisdev/be-kit"
+
+SchedulerKit.setup({ engine: "node-cron" })
+```
+
+### Define Job
+
+```typescript
+import { CronJob } from "@alisdev/be-kit"
+
+@CronJob("0 * * * *", { 
+  runOnInit: true,
+  onSuccess: (name, duration) => console.log(`${name} finished in ${duration}ms`)
+})
+export class HourlyReportJob {
+  async execute() {
+    // report logic
+  }
+}
+```
+
+### Register and Control
+
+```typescript
+SchedulerKit.register(HourlyReportJob)
+SchedulerKit.startAll()
+
+// Get status
+const status = SchedulerKit.status()
+```
+
 ## API Reference & Variables
 
 ### 1. `SchedulerKit.setup(config)` Options
@@ -21,17 +65,6 @@ Decorate a class that implements an `execute()` method.
 | `options.retries` | `number` | No | Number of times to retry a failed execution. |
 | `options.onSuccess` | `(name: string, durationMs: number) => void` | No | Callback when the job succeeds. |
 | `options.onError` | `(name: string, error: Error) => void` | No | Callback when the job throws an error. |
-
-```typescript
-import { CronJob } from "@alisdev/be-kit";
-
-@CronJob("0 0 * * *", { runOnInit: true, retries: 3 })
-export class DailyBackupJob {
-  async execute() {
-    // Return values are ignored; exceptions trigger `onError`
-  }
-}
-```
 
 ### 3. `SchedulerKit` Methods (Inputs/Outputs)
 

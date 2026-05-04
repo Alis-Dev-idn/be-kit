@@ -2,6 +2,54 @@
 
 The `socket-kit` integrates Socket.io with a robust Object-Oriented decorator pattern, allowing for clean, namespace-separated WebSocket controllers with automatic parameter injection and payload validation.
 
+## Features
+
+- **Class-based Namespaces**: Use `@SocketController` for logical separation.
+- **Event Listeners**: Bind methods with `@OnMessage`.
+- **Validation**: Validate incoming payloads with Zod via `@MessagePayload`.
+- **Lifecycle Hooks**: Trigger logic on connect/disconnect (`@OnConnect`, `@OnDisconnect`).
+- **Room Management**: Dynamic room joining with `@JoinRoom`.
+
+## Usage
+
+### Define Gateway
+
+```typescript
+import { z } from "zod"
+import { SocketController, OnMessage, MessagePayload, SocketClient } from "@alisdev/be-kit"
+
+const JoinRoomSchema = z.object({ roomId: z.string() })
+
+@SocketController("/chat")
+export class ChatGateway {
+  
+  @OnMessage("join")
+  async handleJoin(
+    @MessagePayload(JoinRoomSchema) payload: any,
+    @SocketClient() client: any
+  ) {
+    client.join(payload.roomId)
+    return { success: true, joined: payload.roomId }
+  }
+}
+```
+
+### Setup & Register
+
+```typescript
+import http from "http"
+import express from "express"
+import { SocketKit } from "@alisdev/be-kit"
+
+const app = express()
+const server = http.createServer(app)
+
+SocketKit.setup({ engine: "socketio", server })
+SocketKit.register(ChatGateway)
+
+server.listen(3000)
+```
+
 ## API Reference & Variables
 
 ### 1. `SocketKit.setup(config)` Options
@@ -33,28 +81,6 @@ Similar to Router-Kit, inject data directly into your method signatures.
 | :--- | :--- | :--- |
 | `@MessagePayload(schema?)` | `schema?: ZodSchema` | Extracts the raw event payload. If a Zod schema is provided, it automatically validates the data before executing the method. |
 | `@SocketClient()` | `none` | Extracts the raw `Socket` client instance (useful for extracting `client.id`). |
-
-```typescript
-import { z } from "zod";
-import { SocketController, OnMessage, MessagePayload, SocketClient, SocketKit } from "@alisdev/be-kit";
-
-const ChatMessageSchema = z.object({
-  roomId: z.string(),
-  text: z.string()
-});
-
-@SocketController("/chat")
-export class ChatGateway {
-  
-  @OnMessage("message.send")
-  async sendMessage(
-    @MessagePayload(ChatMessageSchema) payload: z.infer<typeof ChatMessageSchema>,
-    @SocketClient() client: any
-  ) {
-    SocketKit.toRoom("/chat", payload.roomId, "message.received", { senderId: client.id, ...payload });
-  }
-}
-```
 
 ### 4. `SocketKit` Broadcaster Methods
 

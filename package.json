@@ -1,6 +1,6 @@
 {
   "name": "@alisdev/be-kit",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "All-in-one backend utility kit for Node.js + TypeScript",
   "repository": {
     "type": "git",

@@ -7,6 +7,52 @@ The `mongo-kit` provides an elegant, decorator-based abstraction over Mongoose, 
 - **Repositories**: `@Repository` and `BaseRepository<T>` with built-in CRUD operations.
 - **Transactions**: Thread-local session tracking using `@Transactional` or `MongoKit.withTransaction`.
 - **Query Builder**: Relational and custom query generation with `CustomBuilder`.
+- **Zod Integration**: Full type safety with Zod schema validation.
+
+## Usage
+
+### Define Entity
+
+```typescript
+import { Schema, BaseEntity, VirtualField } from "@alisdev/be-kit"
+
+@Schema({ collection: "users" })
+export class User extends BaseEntity {
+  firstName: string
+  lastName: string
+
+  @VirtualField((doc) => `${doc.firstName} ${doc.lastName}`)
+  fullName: string
+}
+```
+
+### Define Repository
+
+```typescript
+import { Repository, BaseRepository, Transactional } from "@alisdev/be-kit"
+
+@Repository(User)
+export class UserRepository extends BaseRepository<User> {
+  
+  @Transactional()
+  async createWithProfile(userData: Partial<User>) {
+    const user = await this.save(userData)
+    // ... other operations in the same transaction
+    return user
+  }
+}
+```
+
+### Querying
+
+```typescript
+import { CustomBuilder, SearchCustom, CustomOperation } from "@alisdev/be-kit"
+
+const builder = new CustomBuilder<User>()
+builder.with(SearchCustom.of("firstName", CustomOperation.LIKE, "John"))
+
+const users = await userRepo.find(builder.build())
+```
 
 ## API Reference & Variables
 
@@ -64,13 +110,7 @@ All entities extending `BaseEntity` automatically inherit these fields:
 | `page` | `number` | Current page number. |
 | `size` | `number` | Number of items per page. |
 
-### 4. Custom Builder
-
-```typescript
-const builder = new CustomBuilder<Product>();
-builder.with(SearchCustom.of("price", CustomOperation.GREATER_THAN, 1000));
-const query = builder.build(); // Returns BuiltQuery<T>
-```
+### 4. Custom Builder Operations
 
 | Operation (`CustomOperation`) | MongoDB Equivalent | Example Usage |
 | :--- | :--- | :--- |

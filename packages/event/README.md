@@ -2,6 +2,51 @@
 
 The `event-kit` facilitates decoupled, event-driven architectures by providing robust event emission and decorator-based listeners with wildcard and asynchronous support.
 
+## Features
+
+- **Decorator Listeners**: Bind methods to events using `@OnEvent`.
+- **Wildcard Support**: Subscribe to `user.*` or `**`.
+- **Async & Queueing**: Handle events asynchronously or push to BullMQ.
+- **Event History**: Track emitted events and their status.
+
+## Usage
+
+### Setup
+
+```typescript
+import { EventKit } from "@alisdev/be-kit"
+
+EventKit.setup({
+  engine: "memory",
+  history: { enabled: true, maxSize: 100 }
+})
+```
+
+### Define Handler
+
+```typescript
+import { OnEvent } from "@alisdev/be-kit"
+
+@OnEvent("user.created", { async: true })
+export class WelcomeEmailHandler {
+  async handle(payload: { email: string }) {
+    console.log(`Sending welcome email to ${payload.email}`)
+  }
+}
+```
+
+### Register & Emit
+
+```typescript
+EventKit.register(WelcomeEmailHandler)
+
+// Emitting an event
+await EventKit.emit("user.created", { email: "johndoe@example.com" })
+
+// Check history
+console.log(EventKit.history("user.created"))
+```
+
 ## API Reference & Variables
 
 ### 1. `EventKit.setup(config)` Options
@@ -25,17 +70,6 @@ Decorate a class containing a `handle(payload, eventName?)` method.
 | `options.async` | `boolean` | `true` | If true, the event loop does not wait for the handler to finish. |
 | `options.queue` | `boolean` | `false` | If true, dispatches to a BullMQ queue instead of executing locally. |
 | `options.retries` | `number` | `0` | Auto-retry handler on failure. |
-
-```typescript
-import { OnEvent } from "@alisdev/be-kit";
-
-@OnEvent("user.*", { async: true, retries: 3 })
-export class UserAuditHandler {
-  async handle(payload: any, eventName: string) {
-    console.log(`[AUDIT] Event ${eventName}`, payload);
-  }
-}
-```
 
 ### 3. `EventKit` Methods
 
