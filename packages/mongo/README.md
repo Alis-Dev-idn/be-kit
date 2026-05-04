@@ -8,89 +8,75 @@ The `mongo-kit` provides an elegant, decorator-based abstraction over Mongoose, 
 - **Transactions**: Thread-local session tracking using `@Transactional` or `MongoKit.withTransaction`.
 - **Query Builder**: Relational and custom query generation with `CustomBuilder`.
 
-## API Reference
+## API Reference & Variables
 
-### 1. `BaseEntity` & `@Schema`
-All entities should extend `BaseEntity` (which provides `_id`, `createdAt`, `updatedAt`, `createdBy`, `updatedBy`).
+### 1. `BaseEntity` Properties
+All entities extending `BaseEntity` automatically inherit these fields:
 
-```typescript
-import { Schema, BaseEntity, VirtualField } from "@alisdev/be-kit";
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `_id` | `string` | MongoDB document ID |
+| `createdAt` | `Date` | Creation timestamp |
+| `updatedAt` | `Date` | Last update timestamp |
+| `createdBy` | `string \| null` | ID of the user who created the record |
+| `updatedBy` | `string \| null` | ID of the user who last updated the record |
 
-interface SchemaOptions {
-  collection: string;
-  timestamps?: boolean;
-  versionKey?: boolean | string;
-}
+### 2. `@Schema(options)` Decorator
 
-@Schema({ collection: "products" })
-export class Product extends BaseEntity {
-  name: string;
-  price: number;
+| Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `collection` | `string` | **Required** | The name of the MongoDB collection. |
+| `timestamps` | `boolean` | `true` | Automatically manage `createdAt` and `updatedAt`. |
+| `versionKey` | `boolean \| string` | `false` | Mongoose version key (`__v`). |
 
-  @VirtualField((doc: any) => `$${doc.price.toFixed(2)}`)
-  formattedPrice: string;
-}
-```
+### 3. `BaseRepository<T>` Methods
 
-### 2. `BaseRepository<T>` & `@Repository`
-The generic repository provides: `save`, `update`, `delete`, `find`, `findOne`, `findById`, and `findAll` (paginated).
+| Method | Parameters (Input) | Return Type (Output) | Description |
+| :--- | :--- | :--- | :--- |
+| `save` | `data: Partial<T>`,<br>`options?: RepositoryOptions` | `Promise<T>` | Creates a new document. |
+| `update` | `id: string`,<br>`data: Partial<T>`,<br>`options?: RepositoryOptions` | `Promise<T \| null>` | Updates an existing document by ID. |
+| `delete` | `id: string`,<br>`options?: RepositoryOptions` | `Promise<boolean>` | Deletes a document by ID. |
+| `find` | `query?: BuiltQuery<T>`,<br>`options?: RepositoryOptions` | `Promise<T[]>` | Finds multiple documents based on a query. |
+| `findOne` | `query?: BuiltQuery<T>`,<br>`options?: RepositoryOptions` | `Promise<T \| null>` | Finds a single document based on a query. |
+| `findById` | `id: string`,<br>`options?: RepositoryOptions` | `Promise<T \| null>` | Finds a document by its ID. |
+| `findAll` | `query?: BuiltQuery<T>`,<br>`pageable?: IPageable`,<br>`options?: RepositoryOptions` | `Promise<PageResult<T>>` | Returns paginated results. |
 
-```typescript
-import { Repository, BaseRepository } from "@alisdev/be-kit";
+#### `RepositoryOptions`
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `actorId` | `string` | Used to populate `createdBy` and `updatedBy` fields automatically. |
+| `session` | `ClientSession` | Manual Mongoose session (usually handled automatically by `@Transactional`). |
 
-@Repository(Product)
-export class ProductRepository extends BaseRepository<Product> {
-  // Add custom data access methods here
-  async findByPriceRange(min: number, max: number): Promise<Product[]> {
-    return this.find({ filter: { price: { $gte: min, $lte: max } } });
-  }
-}
-```
+#### `IPageable`
+| Property | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `page` | `number` | `1` | Page number (1-indexed). |
+| `size` | `number` | `10` | Number of items per page. |
+| `sort` | `string` | `undefined` | Field name to sort by. |
+| `direction`| `"asc" \| "desc"` | `undefined` | Sort direction. |
 
-**Method Signatures:**
-- `save(data: Partial<T>, options?: RepositoryOptions): Promise<T>`
-- `update(id: string, data: Partial<T>, options?: RepositoryOptions): Promise<T | null>`
-- `delete(id: string, options?: RepositoryOptions): Promise<boolean>`
-- `find(query?: BuiltQuery<T>, options?: RepositoryOptions): Promise<T[]>`
-- `findAll(query?: BuiltQuery<T>, pageable?: IPageable, options?: RepositoryOptions): Promise<PageResult<T>>`
-
-*Note: `RepositoryOptions` allows passing an `actorId` for audit fields (`createdBy`, `updatedBy`).*
-
-### 3. Transactions
-Transactions automatically inject the active session into repository operations.
-
-```typescript
-import { Transactional, MongoKit } from "@alisdev/be-kit";
-
-class ProductService {
-  private repo = new ProductRepository();
-
-  // Approach 1: Decorator
-  @Transactional()
-  async processOrder(orderData: any) {
-    const product = await this.repo.save(orderData.product); // Auto-uses session
-    // ... other DB operations
-  }
-
-  // Approach 2: Manual wrapper
-  async manualProcess() {
-    await MongoKit.withTransaction(async () => {
-      await this.repo.delete("123");
-    });
-  }
-}
-```
+#### `PageResult<T>`
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `content` | `T[]` | The array of documents for the current page. |
+| `totalElements` | `number` | Total number of documents matching the filter. |
+| `totalPages` | `number` | Total number of pages available. |
+| `page` | `number` | Current page number. |
+| `size` | `number` | Number of items per page. |
 
 ### 4. Custom Builder
-A fluent API for building Mongoose queries.
 
 ```typescript
-import { CustomBuilder, SearchCustom, CustomOperation } from "@alisdev/be-kit";
-
 const builder = new CustomBuilder<Product>();
-builder.with(SearchCustom.of("name", CustomOperation.LIKE, "Laptop"));
 builder.with(SearchCustom.of("price", CustomOperation.GREATER_THAN, 1000));
-
-const query = builder.build(); // { filter: { name: /Laptop/i, price: { $gt: 1000 } } }
-const results = await repo.find(query);
+const query = builder.build(); // Returns BuiltQuery<T>
 ```
+
+| Operation (`CustomOperation`) | MongoDB Equivalent | Example Usage |
+| :--- | :--- | :--- |
+| `EQUAL` | `{ field: value }` | `SearchCustom.of("status", CustomOperation.EQUAL, "active")` |
+| `NOT_EQUAL` | `{ field: { $ne: value } }` | `SearchCustom.of("role", CustomOperation.NOT_EQUAL, "admin")` |
+| `LIKE` | `{ field: /value/i }` | `SearchCustom.of("name", CustomOperation.LIKE, "john")` |
+| `GREATER_THAN` | `{ field: { $gt: value } }` | `SearchCustom.of("age", CustomOperation.GREATER_THAN, 18)` |
+| `LESS_THAN` | `{ field: { $lt: value } }` | `SearchCustom.of("price", CustomOperation.LESS_THAN, 100)` |
+| `IN` | `{ field: { $in: value } }` | `SearchCustom.of("id", CustomOperation.IN, [1, 2, 3])` |

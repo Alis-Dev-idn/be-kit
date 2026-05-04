@@ -2,83 +2,56 @@
 
 The `scheduler-kit` provides a robust, decorator-based abstraction for defining, registering, and managing cron jobs in Node.js applications.
 
-## Features
-- **Decorators**: Define background jobs cleanly with `@CronJob`.
-- **Runtime Management**: Start, stop, and monitor job statuses dynamically.
-- **Dynamic Registration**: Create and register cron jobs programmatically without classes.
-- **Resilience**: Built-in retry logic and structured error handling.
+## API Reference & Variables
 
-## API Reference
+### 1. `SchedulerKit.setup(config)` Options
 
-### 1. Configuration & Setup
+| Property | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `engine` | `"node-cron"` | Yes | The underlying execution engine. |
 
-```typescript
-import { SchedulerKit } from "@alisdev/be-kit";
+### 2. `@CronJob(expression, options)`
 
-SchedulerKit.setup({ 
-  engine: "node-cron" 
-});
-```
+Decorate a class that implements an `execute()` method.
 
-### 2. Defining Jobs
-
-Decorate a class with `@CronJob` and implement the `execute` method.
+| Parameter | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `expression` | `string` | Yes | Standard cron expression (e.g., `"0 0 * * *"`). |
+| `options.runOnInit` | `boolean` | No | Execute immediately when the app starts. |
+| `options.retries` | `number` | No | Number of times to retry a failed execution. |
+| `options.onSuccess` | `(name: string, durationMs: number) => void` | No | Callback when the job succeeds. |
+| `options.onError` | `(name: string, error: Error) => void` | No | Callback when the job throws an error. |
 
 ```typescript
 import { CronJob } from "@alisdev/be-kit";
 
-@CronJob("0 0 * * *", { // Run every day at midnight
-  runOnInit: true,
-  retries: 3,
-  onSuccess: (name, duration) => console.log(`[${name}] Completed in ${duration}ms`),
-  onError: (name, error) => console.error(`[${name}] Failed:`, error)
-})
+@CronJob("0 0 * * *", { runOnInit: true, retries: 3 })
 export class DailyBackupJob {
   async execute() {
-    console.log("Running database backup...");
-    // backup logic here
+    // Return values are ignored; exceptions trigger `onError`
   }
 }
 ```
 
-### 3. Registering and Controlling Jobs
+### 3. `SchedulerKit` Methods (Inputs/Outputs)
 
-Jobs do not start automatically upon definition; they must be registered and started via `SchedulerKit`.
+| Method | Parameters (Input) | Return Type (Output) | Description |
+| :--- | :--- | :--- | :--- |
+| `register` | `...jobs: Class[]` | `void` | Registers class-based decorated jobs. |
+| `registerDynamic`| `name: string`,<br>`expression: string`,<br>`fn: () => Promise<void>`,<br>`options?: CronOptions` | `void` | Registers a programmatic job without a class. |
+| `startAll` | `none` | `void` | Starts all registered jobs. |
+| `stopAll` | `none` | `void` | Stops all registered jobs. |
+| `start` | `jobName: string` | `void` | Starts a specific job by name. |
+| `stop` | `jobName: string` | `void` | Stops a specific job by name. |
+| `status` | `none` | `Record<string, JobStatus>` | Returns current status of all jobs. |
 
-```typescript
-// Register static classes
-SchedulerKit.register(DailyBackupJob);
+### 4. `JobStatus` Output Type
 
-// Register dynamic closures at runtime
-SchedulerKit.registerDynamic(
-  "dynamic_cleanup", 
-  "*/15 * * * *", 
-  async () => { console.log("Cleaning up temp files..."); }
-);
+When calling `SchedulerKit.status()`, you receive a map of objects with these properties:
 
-// Start all registered jobs
-SchedulerKit.startAll();
-
-// Pause or stop specific jobs
-SchedulerKit.stop("DailyBackupJob");
-SchedulerKit.start("DailyBackupJob");
-```
-
-### 4. Status Monitoring
-
-Retrieve the real-time status and execution history of all active jobs.
-
-```typescript
-const statuses = SchedulerKit.status();
-console.log(statuses);
-/* Output:
-{
-  "DailyBackupJob": { 
-    status: "running", 
-    lastRun: 1678886400000, 
-    nextRun: 1678972800000, 
-    errorCount: 0 
-  }
-}
-*/
-```
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `status` | `"running" \| "stopped" \| "failed"` | Current operational state. |
+| `lastRun` | `number` | Unix timestamp (ms) of the last execution. |
+| `nextRun` | `number` | Unix timestamp (ms) of the next scheduled execution. |
+| `errorCount` | `number` | Total number of accumulated failures. |

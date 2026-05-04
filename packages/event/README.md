@@ -2,89 +2,60 @@
 
 The `event-kit` facilitates decoupled, event-driven architectures by providing robust event emission and decorator-based listeners with wildcard and asynchronous support.
 
-## Features
-- **Decorators**: Subscribe to events using the `@OnEvent` decorator.
-- **Pattern Matching**: Native support for wildcards (`user.*`, `*.created`, `**`).
-- **History Tracking**: Automatically records event logs, allowing you to replay past or failed events.
-- **Middleware Hooks**: Attach global `beforeEmit`, `afterEmit`, and `onError` lifecycle hooks.
+## API Reference & Variables
 
-## API Reference
+### 1. `EventKit.setup(config)` Options
 
-### 1. Configuration & Setup
+| Property | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `engine` | `"memory" \| "redis"` | Yes | The underlying event bus implementation. |
+| `hooks.beforeEmit` | `(event, payload) => void`| No | Hook called immediately before an event fires. |
+| `hooks.afterEmit` | `(event, payload) => void`| No | Hook called after an event fires. |
+| `hooks.onError` | `(event, error, handlerName) => void` | No | Hook called when an event handler throws an error. |
+| `history.enabled` | `boolean` | No | Whether to record event history. |
+| `history.maxSize` | `number` | No | Maximum number of events to keep in memory per topic. |
 
-```typescript
-import { EventKit } from "@alisdev/be-kit";
+### 2. `@OnEvent(pattern, options)`
 
-EventKit.setup({
-  engine: "memory", // Uses eventemitter2 under the hood
-  hooks: {
-    beforeEmit: (event, payload) => console.log(`Emitting ${event}...`),
-    onError: (event, error, handler) => console.error(`${handler} failed:`, error)
-  },
-  history: {
-    enabled: true,
-    maxSize: 100 // Keep last 100 events in memory
-  }
-});
-```
+Decorate a class containing a `handle(payload, eventName?)` method.
 
-### 2. Defining Event Listeners
-
-Use the `@OnEvent` decorator to register a class as a listener. The class must implement a `handle(payload, eventName?)` method.
+| Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `pattern` | `string` | **Required** | The event topic (e.g., `"user.created"`) or wildcard (`"user.*"`). |
+| `options.async` | `boolean` | `true` | If true, the event loop does not wait for the handler to finish. |
+| `options.queue` | `boolean` | `false` | If true, dispatches to a BullMQ queue instead of executing locally. |
+| `options.retries` | `number` | `0` | Auto-retry handler on failure. |
 
 ```typescript
 import { OnEvent } from "@alisdev/be-kit";
 
-// Exact match
-@OnEvent("user.created", { async: true, retries: 3 })
-export class SendWelcomeEmailHandler {
-  async handle(payload: { email: string, name: string }) {
-    await MailerKit.send(WelcomeEmail, payload);
-  }
-}
-
-// Wildcard match
-@OnEvent("user.*")
+@OnEvent("user.*", { async: true, retries: 3 })
 export class UserAuditHandler {
   async handle(payload: any, eventName: string) {
-    console.log(`[AUDIT] User event triggered: ${eventName}`, payload);
+    console.log(`[AUDIT] Event ${eventName}`, payload);
   }
 }
 ```
 
-### 3. Emitting and Controlling Events
+### 3. `EventKit` Methods
 
-Register your handlers and emit payloads globally.
+| Method | Parameters (Input) | Return Type (Output) | Description |
+| :--- | :--- | :--- | :--- |
+| `setup` | `config: EventKitConfig` | `void` | Initializes the event engine. |
+| `register` | `...handlers: Class[]` | `void` | Registers class-based listeners. |
+| `emit<T>` | `event: string`,<br>`payload: T` | `Promise<void>` | Emits an event with strongly typed payload. |
+| `once<T>` | `event: string`,<br>`handler: (p: T) => void`| `void` | Manually attaches a one-time listener function. |
+| `off` | `event: string`,<br>`handler: Class` | `void` | Unsubscribes a specific handler. |
+| `offAll` | `event: string` | `void` | Removes all listeners for a specific event topic. |
+| `history` | `event: string` | `EventHistoryEntry[]`| Returns execution history if enabled. |
 
-```typescript
-import { EventKit } from "@alisdev/be-kit";
+### 4. `EventHistoryEntry` Output
 
-// Register all listeners
-EventKit.register(SendWelcomeEmailHandler, UserAuditHandler);
-
-// Emit an event
-await EventKit.emit("user.created", { email: "john@doe.com", name: "John" });
-
-// Manually subscribe for a single emission
-EventKit.once("system.shutdown", async () => {
-  console.log("Shutting down gracefully...");
-});
-```
-
-### 4. Event History
-
-If history is enabled, you can inspect and replay events.
-
-```typescript
-const history = EventKit.history("user.created");
-console.log(history);
-/* Output:
-[{
-  event: "user.created",
-  payload: { email: "..." },
-  emittedAt: 2026-05-04T12:00:00Z,
-  status: "success",
-  handlerName: "SendWelcomeEmailHandler"
-}]
-*/
-```
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `event` | `string` | The actual event topic string that was emitted. |
+| `payload` | `any` | The data sent with the event. |
+| `emittedAt` | `Date` | Timestamp of emission. |
+| `status` | `"success" \| "failed"` | Execution outcome of the handler. |
+| `error` | `string` | Error message (if status is "failed"). |
+| `handlerName`| `string` | The class name of the executed listener. |

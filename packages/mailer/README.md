@@ -2,42 +2,35 @@
 
 The `mailer-kit` simplifies email delivery by abstracting providers (like Nodemailer) and integrating a powerful string-interpolation template engine.
 
-## Features
-- **Decorators**: Define templates directly on classes with `@EmailTemplate`.
-- **Template Engine**: Dynamic variable interpolation using `${variable}` or `${nested.variable}` syntax inside HTML templates.
-- **Provider Agnostic**: Easily switch between Nodemailer, Resend, or custom providers.
-- **Asynchronous Queues**: Send emails synchronously or push them to a memory/BullMQ queue.
+## API Reference & Variables
 
-## API Reference
+### 1. `MailerKit.setup(config)` Options
 
-### 1. Configuration & Setup
+Initialize the kit before usage.
 
-Initialize `MailerKit` with your desired provider and queue settings before sending any emails.
+| Property | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `provider` | `"nodemailer"` | Yes | The email delivery service provider to use. |
+| `config` | `object` | Yes | Provider-specific configuration. |
+| `config.host` | `string` | No | SMTP host (for nodemailer). |
+| `config.port` | `number` | No | SMTP port (for nodemailer). |
+| `config.auth` | `{ user: string, pass: string }` | No | SMTP credentials (for nodemailer). |
+| `from` | `string` | Yes | Default sender email address. |
+| `queue.engine`| `"memory"` | No | Queueing system for background processing. |
 
-```typescript
-import { MailerKit } from "@alisdev/be-kit";
+### 2. `@EmailTemplate(name, options)`
 
-MailerKit.setup({
-  provider: "nodemailer",
-  config: {
-    host: "smtp.mailtrap.io",
-    port: 2525,
-    auth: { user: "username", pass: "password" }
-  },
-  from: "noreply@myapp.com",
-  queue: { engine: "memory" }
-});
-```
+Decorate a class to link it to an HTML template file.
 
-### 2. Defining a Template
+| Option | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `name` | `string` | Yes | Unique identifier for the template. |
+| `options.template`| `string` | Yes | Relative or absolute path to the HTML template file. |
+| `options.subject` | `string` | Yes | The subject line of the email. |
 
-Create an HTML file (`./templates/welcome.html`):
-```html
-<h1>Welcome ${name}!</h1>
-<p>Thank you for joining ${company.name}.</p>
-```
+### 3. Template Variables (Input)
 
-Bind the template to a TypeScript class using `@EmailTemplate`. The class properties represent the data required by the template.
+The properties defined in your `@EmailTemplate` decorated class act as the input variables injected into the HTML template.
 
 ```typescript
 import { EmailTemplate } from "@alisdev/be-kit";
@@ -47,30 +40,25 @@ import { EmailTemplate } from "@alisdev/be-kit";
   subject: "Welcome to our platform!" 
 })
 export class WelcomeEmail {
-  to: string;       // Required: recipient email
-  name: string;     // Template variable
-  company: {        // Nested template variable
+  to: string;       // Required: The recipient email address
+  name: string;     // Custom variable: accessed as ${name}
+  company: {        // Nested variable: accessed as ${company.name}
     name: string;
   };
 }
 ```
 
-### 3. Sending Emails
-
-```typescript
-import { MailerKit } from "@alisdev/be-kit";
-
-// Send immediately
-await MailerKit.send(WelcomeEmail, {
-  to: "user@example.com",
-  name: "John Doe",
-  company: { name: "AlisDev" }
-});
-
-// Or add to background queue
-await MailerKit.queue(WelcomeEmail, {
-  to: "user@example.com",
-  name: "Jane Doe",
-  company: { name: "AlisDev" }
-}, { priority: 1 });
+**Template (`welcome.html`):**
+```html
+<h1>Welcome ${name}!</h1>
+<p>Thank you for joining ${company.name}.</p>
 ```
+
+### 4. `MailerKit` Methods
+
+| Method | Parameters (Input) | Return Type (Output) | Description |
+| :--- | :--- | :--- | :--- |
+| `send` | `TemplateClass: Class`,<br>`data: object` | `Promise<void>` | Sends an email immediately synchronously. |
+| `queue` | `TemplateClass: Class`,<br>`data: object`,<br>`options?: QueueOptions` | `Promise<void>` | Pushes the email to a background queue for async delivery. |
+
+*(Note: `QueueOptions` depends on the queue engine, e.g., `{ priority: number }` for BullMQ).*

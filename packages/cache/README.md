@@ -2,74 +2,43 @@
 
 The `cache-kit` provides elegant caching strategies via decorators, allowing you to easily cache method return values, update caches, or invalidate them.
 
-## Features
-- **Declarative**: Use `@Cacheable`, `@CachePut`, and `@CacheEvict` to manage cache state.
-- **Dynamic Keys**: Interpolate method arguments into cache keys using `${argumentName}`.
-- **Multiple Engines**: Supports `memory` and `redis` stores (Redis requires manual adapter implementation for now).
-- **Programmatic API**: Direct access to the cache store via `CacheKit`.
+## API Reference & Variables
 
-## API Reference
+### 1. `CacheKit.setup(config)` Options
 
-### 1. Configuration & Setup
+| Property | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `store` | `"memory" \| "redis"` | Yes | The backing storage engine. |
 
-```typescript
-import { CacheKit } from "@alisdev/be-kit";
+### 2. Cache Decorators
 
-CacheKit.setup({ 
-  store: "memory" 
-});
-```
+Decorators process inputs (keys, TTLs) and affect the caching layer around your method outputs. Key interpolation is supported: e.g., `"user:${id}"` reads the `id` argument of the decorated method.
 
-### 2. Caching Method Results
-
-Use `@Cacheable` to bypass execution and return cached data if it exists.
+| Decorator | Options (Input) | Behavior |
+| :--- | :--- | :--- |
+| `@Cacheable(options)`| `{ key: string, ttl?: number, condition?: (res: any) => boolean }` | Returns cached value if exists. Otherwise runs method, caches the output, and returns it. |
+| `@CachePut(options)` | `{ key: string, ttl?: number }` | Always executes method and forces an update of the cache with the new output. |
+| `@CacheEvict(options)`| `{ key?: string, pattern?: string, beforeInvoke?: boolean }`| Removes a specific key or pattern. Runs before or after method execution. |
 
 ```typescript
 import { Cacheable, CacheEvict } from "@alisdev/be-kit";
 
 class UserService {
-  
-  // The key resolves to "user:123" if the id parameter is "123".
-  // The result is cached for 300 seconds (5 minutes).
   @Cacheable({ key: "user:${id}", ttl: 300 })
-  async getUserProfile(id: string) {
-    console.log("Fetching from database...");
-    return await db.users.findById(id);
-  }
+  async getUserProfile(id: string) { return await db.findById(id); }
 
-  // Invalidates the specific cache entry when the user is updated.
-  @CacheEvict({ key: "user:${id}" })
-  async updateUser(id: string, data: any) {
-    await db.users.update(id, data);
-  }
-  
-  // Clears all cache keys matching the pattern.
   @CacheEvict({ pattern: "user:*" })
-  async flushUserCache() {
-    console.log("All user caches invalidated.");
-  }
+  async flushUserCache() {}
 }
 ```
 
-### 3. Programmatic Cache Access
+### 3. `CacheKit` Programmatic API
 
-You can also interact with the cache directly using the `CacheKit` static methods.
-
-```typescript
-import { CacheKit } from "@alisdev/be-kit";
-
-// Set a value
-await CacheKit.set("session:token_abc", { userId: "123" }, { ttl: 3600 });
-
-// Get a value
-const session = await CacheKit.get<{ userId: string }>("session:token_abc");
-
-// Check existence
-const exists = await CacheKit.has("session:token_abc");
-
-// Delete specific key
-await CacheKit.delete("session:token_abc");
-
-// Delete by pattern
-await CacheKit.deletePattern("session:*");
-```
+| Method | Parameters (Input) | Return Type (Output) | Description |
+| :--- | :--- | :--- | :--- |
+| `get<T>` | `key: string` | `Promise<T \| null>` | Retrieves a value from the cache. |
+| `set<T>` | `key: string`,<br>`value: T`,<br>`options?: { ttl?: number }` | `Promise<void>` | Sets a value in the cache with an optional TTL. |
+| `has` | `key: string` | `Promise<boolean>` | Checks if a key exists. |
+| `delete` | `key: string` | `Promise<void>` | Deletes a specific key. |
+| `deletePattern` | `pattern: string` | `Promise<void>` | Deletes all keys matching a glob pattern (e.g., `user:*`). |
+| `clear` | `none` | `Promise<void>` | Clears the entire cache store. |

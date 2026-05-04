@@ -5,83 +5,67 @@ The `router-kit` bridges Object-Oriented Programming with Express.js by allowing
 ## Features
 - **Class-level Routing**: `@ReqController` for defining base routes.
 - **Method-level Routing**: `@GetMapping`, `@PostMapping`, etc.
-- **Parameter Injection**: Safely extract payloads with `@Body`, `@Query`, `@Param`, `@Req`, `@Res`, and `@Cookie`.
-- **Middleware**: Attach Express middleware at the class or method level with `@UseMiddleware`.
-- **Exception Handling**: Standardized HTTP Exceptions (`BadRequestException`, `NotFoundException`, etc.) that are automatically caught and sent to the client.
+- **Parameter Injection**: Safely extract payloads with `@Body`, `@Query`, `@Param`, etc.
+- **Middleware**: Attach Express middleware at the class or method level.
+- **Exception Handling**: Standardized HTTP Exceptions.
 
-## API Reference
+## API Reference & Variables
 
-### 1. Defining a Controller
+### 1. Class & Method Decorators
 
-```typescript
-import { 
-  ReqController, GetMapping, PostMapping, PutMapping, DeleteMapping, 
-  Body, Param, Query, UseMiddleware 
-} from "@alisdev/be-kit";
+| Decorator | Argument (Input) | Description |
+| :--- | :--- | :--- |
+| `@ReqController(path)` | `path: string` | Defines the base route for the entire controller class (e.g., `"/api/users"`). |
+| `@GetMapping(path)` | `path: string` | Maps HTTP GET requests to the method. |
+| `@PostMapping(path)` | `path: string` | Maps HTTP POST requests to the method. |
+| `@PutMapping(path)` | `path: string` | Maps HTTP PUT requests to the method. |
+| `@PatchMapping(path)` | `path: string` | Maps HTTP PATCH requests to the method. |
+| `@DeleteMapping(path)`| `path: string` | Maps HTTP DELETE requests to the method. |
+| `@UseMiddleware(...m)`| `...middlewares: RequestHandler[]` | Applies Express middleware to a class or a specific method. |
 
-// Class-level middleware applies to all routes in the controller
-@ReqController("/api/products")
-@UseMiddleware(AuthMiddleware) 
-export class ProductController {
+### 2. Parameter Decorators (Input Variables)
 
-  @GetMapping("/")
-  async listProducts(@Query("page") page: string = "1") {
-    // Return objects/arrays directly; RouterKit handles res.json()
-    return { data: [], page }; 
-  }
+Inject specific parts of the HTTP request directly into your method parameters.
 
-  @GetMapping("/:id")
-  async getProduct(@Param("id") id: string) {
-    return { id, name: "Sample Product" };
-  }
+| Decorator | Argument | Injected Value | Example |
+| :--- | :--- | :--- | :--- |
+| `@Body(key?)` | `string?` | `req.body` or `req.body[key]` | `@Body("email") email: string` |
+| `@Query(key?)` | `string?` | `req.query` or `req.query[key]`| `@Query("page") page: string` |
+| `@Param(key?)` | `string?` | `req.params` or `req.params[key]`| `@Param("id") id: string` |
+| `@Req()` | `none` | Raw Express `Request` object | `@Req() req: Request` |
+| `@Res()` | `none` | Raw Express `Response` object| `@Res() res: Response` |
+| `@Cookie(key?)`| `string?` | `req.cookies` or `req.cookies[key]`| `@Cookie("session_id") sessionId: string` |
 
-  @PostMapping("/")
-  @UseMiddleware(ValidateProductMiddleware) // Method-level middleware
-  async createProduct(@Body() payload: any) {
-    return { success: true, payload };
-  }
-}
-```
+### 3. Controller Method Returns (Outputs)
 
-### 2. Registering Controllers
+When a controller method returns a value, `router-kit` automatically sends it as a JSON response using `res.json()`. 
 
-Use `RouterKit.register` to bind your decorated classes to an Express application instance.
+| Return Type | Express Behavior | Example |
+| :--- | :--- | :--- |
+| `object` / `array` | Sent as `res.json(data)` | `return { success: true }` |
+| `Promise<object>` | Awaited, then sent as `res.json(data)` | `return await db.find()` |
+| `void` / `undefined`| Request is left hanging (useful if using `@Res()` manually) | `res.send("Done")` |
 
-```typescript
-import express from "express";
-import { RouterKit } from "@alisdev/be-kit";
+### 4. Built-in Exceptions
 
-const app = express();
-app.use(express.json());
+Throwing these exceptions anywhere in the controller will automatically return a structured JSON error to the client: `{ "message": string, "status": number }`
 
-// Pass the app and an array of Controller classes
-RouterKit.register(app, [ProductController]);
-
-app.listen(3000);
-```
-
-### 3. Built-in Exceptions
-
-Throw these exceptions anywhere within your controller methods. RouterKit automatically catches them and formats a standardized JSON error response.
+| Exception Class | HTTP Status Code | Default Message |
+| :--- | :--- | :--- |
+| `BadRequestException` | 400 | "Bad Request" |
+| `UnauthorizedException`| 401 | "Unauthorized" |
+| `ForbiddenException` | 403 | "Forbidden" |
+| `NotFoundException` | 404 | "Not Found" |
+| `ConflictException` | 409 | "Conflict" |
+| `ServerErrorException` | 500 | "Internal Server Error" |
 
 ```typescript
-import { NotFoundException, BadRequestException } from "@alisdev/be-kit";
+import { NotFoundException } from "@alisdev/be-kit";
 
 @GetMapping("/:id")
 async getProduct(@Param("id") id: string) {
-  if (!id) throw new BadRequestException("Product ID is required");
-  
   const product = await repo.findById(id);
   if (!product) throw new NotFoundException(`Product ${id} not found`);
-  
   return product;
 }
 ```
-
-Available Exceptions:
-- `BadRequestException` (400)
-- `UnauthorizedException` (401)
-- `ForbiddenException` (403)
-- `NotFoundException` (404)
-- `ConflictException` (409)
-- `ServerErrorException` (500)
